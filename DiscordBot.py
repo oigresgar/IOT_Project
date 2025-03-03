@@ -1,5 +1,6 @@
 import discord
 import asyncio
+from AmiLab import AmiLabHttp as AmiLab
 
 class DiscordBot(discord.Client):
     """
@@ -9,7 +10,7 @@ class DiscordBot(discord.Client):
         intents (discord.Intents): The intents for the bot.
     """
 
-    def __init__(self, intents, hugchat_credentials=None):
+    def __init__(self, intents):
         """
         Initializes the bot.
 
@@ -59,3 +60,8 @@ class DiscordBot(discord.Client):
             "Commands:\n"
             "+help: Shows this message\n"
         )
+
+if __name__ == "__main__":
+    intents = discord.Intents.default()
+    bot = DiscordBot(intents)
+    bot.run("ODQwNjA0MjY0NzYwNzY5NjE4.YJ2d6w.8k9k4Vw8Hj6fJhR2Xc5Xu8gQcTc")
