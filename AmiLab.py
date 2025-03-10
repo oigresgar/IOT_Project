@@ -1,4 +1,6 @@
 import requests
+from dotenv import load_dotenv
+import os
 
 
 class AmiLabHttp:
@@ -29,19 +31,21 @@ class AmiLabHttp:
             headers=headers,
             json=data,
         ).json()
-    
+
     def get_snapshot(self) -> bytes:
         headers = {
             "Authorization": "Bearer " + self.token,
             "Content-Type": "image/jpeg",
         }
-        return requests.get(self.url + "/camera_proxy/camera.amicam", headers=headers).content
-        
+        return requests.get(
+            self.url + "/camera_proxy/camera.amicam", headers=headers
+        ).content
 
 
 if __name__ == "__main__":
-    url = "https://danubio.ii.uam.es/api"
-    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI0NDdlODRkYTExNmI0Yzk2YjIxM2ExMDdhMTY2NmVmMCIsImlhdCI6MTY3ODI3MTU4OSwiZXhwIjoxOTkzNjMxNTg5fQ.-jUvyVsmzQMxrkRd1kLNM_PIH1HTGnzsOzESDWlPukE"
+    load_dotenv()
+    url = os.getenv("AMI_LAB_URL")
+    token = os.getenv("AMI_LAB_TOKEN")
     ami_lab = AmiLabHttp(url, token)
     # print(ami_lab.get_state(entity_id="light.lampara_de_lectura"))
     # print(
