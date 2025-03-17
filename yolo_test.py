@@ -3,8 +3,8 @@ from ultralytics import YOLO
 # Load a model
 model = YOLO("yolo11n.pt")  # pretrained YOLO11n model
 
-# Run batched inference on a list of images
-results = model(["snapshot.jpeg"])  # return a list of Results objects
+# Run batched inference on a list of imagess
+results = model.predict(source="snapshot.jpeg", classes = [0])  # return a list of Results objects
 
 # Process results list
 for result in results:
