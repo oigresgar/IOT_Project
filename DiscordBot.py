@@ -4,6 +4,8 @@ import discord
 import json
 from dotenv import load_dotenv
 from AmiLab import AmiLabHttp as AmiLab
+from YoloModel import YoloModel
+from PIL import Image
 
 
 class DiscordBot(discord.Client):
@@ -26,11 +28,13 @@ class DiscordBot(discord.Client):
             url=os.getenv("AMI_LAB_URL"),
             token=os.getenv("AMI_LAB_TOKEN"),
         )
+        self.yolo_model = YoloModel()
         self.commands = {
             "+help": self.handle_help,
             "+snapshot": self.handle_snapshot,
             "+get_state": self.handle_get_state,
             "+post_service": self.handle_post_service,
+            "+count_people": self.handle_count_people,
         }
 
     async def on_ready(self):
@@ -131,6 +135,26 @@ class DiscordBot(discord.Client):
         except Exception as e:
             await message.channel.send(f"Error: {e}")
 
+    async def handle_count_people(self, message: discord.Message):
+        """
+        Handle the count_people command.
+
+        Args:
+            message (discord.Message): The message received.
+        """
+        try:
+            img_bytes = self.ami_lab.get_snapshot()
+            with io.BytesIO(img_bytes) as img_bytes:
+                img = Image.open(img_bytes)
+                count, plot_img = self.yolo_model.count_people_in_img(img)
+
+            with io.BytesIO() as sent_img:
+                plot_img.save(fp=sent_img, format="JPEG")
+                await message.channel.send(f"Number of people detected: {count}")
+                sent_img.seek(0)
+                await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
+        except Exception as e:
+            await message.channel.send(f"Error: {e}")
 
 if __name__ == "__main__":
     load_dotenv()
