@@ -9,10 +9,12 @@ from PIL import Image
 from AmiLab.AmiLab import AmiLabHttp as AmiLab
 from Model.YoloModel import YoloModel
 
+MAX_TRIES = 10
+
 
 class DiscordBot(discord.Client):
     """
-    A discord bot.
+    A discord bot communicated with the Ambient Laboratory of UAM.
 
     Args:
         intents (discord.Intents): The intents for the bot.
@@ -102,12 +104,15 @@ class DiscordBot(discord.Client):
         """
         try:
             entity_id = message.content.split()[1]
-            state = self.ami_lab.get_state(entity_id)
-            await message.channel.send(f"State of {entity_id}: {state}")
+            state_json = self.ami_lab.get_state(entity_id)
+            formatted_state = ""
+            for key, value in state_json.items():
+                formatted_state += f"{key}: {value}\n"
+            await message.channel.send(f"State of {entity_id}:\n{formatted_state}")
         except IndexError:
             await message.channel.send("Usage: +get_state <entity_id>")
         except Exception as e:
-            await message.channel.send(f"Error: {e}")
+            await message.channel.send(f"There was an error obtaining the state :( -> {e}")
 
     async def handle_post_service(self, message: discord.Message):
         """
@@ -141,7 +146,9 @@ class DiscordBot(discord.Client):
                 "Usage: +post_service <entity_id> <service> <command> [extra_data]"
             )
         except Exception as e:
-            await message.channel.send(f"Error: {e}")
+            await message.channel.send(
+                f"There was an error sending the request :( -> {e}"
+            )
 
     async def handle_count_people(self, message: discord.Message):
         """
@@ -158,9 +165,18 @@ class DiscordBot(discord.Client):
                 sent_img.seek(0)
                 await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
         except Exception as e:
-            await message.channel.send(f"Error: {e}")
+            await message.channel.send(
+                f"There was an error counting people in the room :( -> {e}"
+            )
 
     def capture_and_count_people(self):
+        """
+        Capture an image from the AmiLab camera and count the number of people in it.
+
+        Returns:
+            int: The number of people detected in the image.
+            Image: The image with the detected people and the confindence.
+        """
         img_bytes = self.ami_lab.get_snapshot(mock=self.mock)
         with io.BytesIO(img_bytes) as img_bytes:
             img = Image.open(img_bytes)
@@ -168,80 +184,67 @@ class DiscordBot(discord.Client):
         return count, plot_img
 
     async def handle_access_request(self, message: discord.Message):
-        # Try to obtain num of people rqquested
+        """
+        Handle the request_access_to command.
+
+        Args:
+            message (discord.Message): The message received.
+        """
         try:
             parts = message.content.split()
             num_people = int(parts[1])
-        except ValueError:
+        except ValueError or IndexError:
             await message.channel.send("Usage: +request_access_to <num_people>")
             return
-        except IndexError:
-            await message.channel.send("Usage: +request_access_to <num_people>")
-            return
-        print(f"Requested number of people: {num_people}")
 
-        # Get the number of people in the image
-        try:
-            count, plot_img = self.capture_and_count_people()
-        except Exception as e:
-            await message.channel.send(f"Error: {e}")
-            return
-        # Until the number of people is equal to the requested number
-        # set the light to red
-        print(f"Number of people detected: {count}")
-
-        counter = 0
-        try:
-            while count < num_people:
-                if counter > 10:
-                    await message.channel.send(
-                        "Access denied. Too many attempts. Please try again later."
-                    )
-                    return
-                counter += 1
-                sleep(2)
-                # Get the number of people in the image
+        tries = 0
+        while tries <= MAX_TRIES:
+            tries += 1
+            # Get the number of people in the image
+            try:
                 count, plot_img = self.capture_and_count_people()
-                print(f"Number of people detected: {count}")
-                if count < num_people:
-                    # Set the light to red
-                    self.ami_lab.post_service(
-                        entity_id="light.lampara_derecha",
-                        service="light",
-                        command="turn_on",
-                        extra_data={"brightness_pct": "100", "rgb_color": [255, 0, 0]},
-                    )
-                    print("Color set to red")
-                    # Send the image with the number of people detected
-                    with io.BytesIO() as sent_img:
-                        plot_img.save(fp=sent_img, format="JPEG")
-                        sent_img.seek(0)
-
-                        await message.channel.send(
-                            f"Number of people detected: {count}. Access denied >:(. Retrying analysis..."
-                        )
-                        await message.channel.send(
-                            file=discord.File(sent_img, "plot.jpeg")
-                        )
-            # Set the light to green
-            self.ami_lab.post_service(
-                entity_id="light.lampara_derecha",
-                service="light",
-                command="turn_on",
-                extra_data={"brightness_pct": "100", "rgb_color": [0, 255, 0]},
-            )
-            # Send the image with the number of people detected
-            with io.BytesIO() as sent_img:
-                plot_img.save(fp=sent_img, format="JPEG")
-                sent_img.seek(0)
+            except Exception as e:
                 await message.channel.send(
-                    f"Number of people detected: {count}. Access granted ^_^."
+                    f"There was an error counting people in the room :( -> {e}"
                 )
-                sent_img.seek(0)
-                await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
-        except Exception as e:
-            await message.channel.send(f"Error: {e}")
-        return
+                return
+            if count < num_people:
+                self.ami_lab.post_service(
+                    entity_id="light.lampara_derecha",
+                    service="light",
+                    command="turn_on",
+                    extra_data={"brightness_pct": "100", "rgb_color": [255, 0, 0]},
+                )
+
+                with io.BytesIO() as sent_img:
+                    plot_img.save(fp=sent_img, format="JPEG")
+                    sent_img.seek(0)
+
+                    await message.channel.send(
+                        f"Number of people detected: {count}. Access denied >:(. Retrying analysis..."
+                    )
+                    await message.channel.send(
+                        file=discord.File(sent_img, "current_view.jpg")
+                    )
+                sleep(3)
+            else:
+                self.ami_lab.post_service(
+                    entity_id="light.lampara_derecha",
+                    service="light",
+                    command="turn_on",
+                    extra_data={"brightness_pct": "100", "rgb_color": [0, 255, 0]},
+                )
+
+                with io.BytesIO() as sent_img:
+                    plot_img.save(fp=sent_img, format="JPEG")
+                    sent_img.seek(0)
+                    await message.channel.send(
+                        f"Number of people detected: {count}. Access granted ^_^."
+                    )
+                    sent_img.seek(0)
+                    await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
+                return
+        await message.channel.send(f"Max tries reached. Sorry, try again!")
 
     async def handle_mock(self, message: discord.Message):
         """
