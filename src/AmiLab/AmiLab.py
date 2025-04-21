@@ -1,6 +1,7 @@
+import os
+
 import requests
 from dotenv import load_dotenv
-import os
 
 
 class AmiLabHttp:
@@ -34,7 +35,7 @@ class AmiLabHttp:
 
     def get_snapshot(self, mock=False) -> bytes:
         if mock:
-            with open("mock.jpg", "rb") as f:
+            with open("utils/mock.jpg", "rb") as f:
                 return f.read()
         headers = {
             "Authorization": "Bearer " + self.token,
@@ -55,8 +56,8 @@ if __name__ == "__main__":
         ami_lab.post_service(
             entity_id="light.lampara_derecha",
             service="light",
-            command="turn_on",
-            extra_data={"brightness_pct": "100", "rgb_color": [255, 0, 0]},
+            command="turn_off",
+            # extra_data={"brightness_pct": "100", "rgb_color": [255, 0, 0]},
         )
     )
 

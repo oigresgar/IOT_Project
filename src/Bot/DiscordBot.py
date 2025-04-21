@@ -1,12 +1,13 @@
 import io
+import json
 import os
 from time import sleep
+
 import discord
-import json
-from dotenv import load_dotenv
-from AmiLab import AmiLabHttp as AmiLab
-from YoloModel import YoloModel
 from PIL import Image
+
+from AmiLab.AmiLab import AmiLabHttp as AmiLab
+from Model.YoloModel import YoloModel
 
 
 class DiscordBot(discord.Client):
@@ -241,7 +242,7 @@ class DiscordBot(discord.Client):
         except Exception as e:
             await message.channel.send(f"Error: {e}")
         return
-    
+
     async def handle_mock(self, message: discord.Message):
         """
         Handle the mock command.
@@ -254,12 +255,3 @@ class DiscordBot(discord.Client):
             await message.channel.send("Mock mode enabled.")
         else:
             await message.channel.send("Mock mode disabled.")
-
-
-if __name__ == "__main__":
-    load_dotenv()
-    token = os.getenv("DISCORD_TOKEN")
-    intents = discord.Intents.default()
-    intents.message_content = True
-    bot = DiscordBot(intents)
-    bot.run(token)

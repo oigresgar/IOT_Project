@@ -2,7 +2,7 @@ from ultralytics import YOLO
 from PIL import Image
 
 
-YOLO_MODEL_PATH = "yolo11n.pt"
+YOLO_MODEL_PATH = "utils/yolo11n.pt"
 
 
 class YoloModel:

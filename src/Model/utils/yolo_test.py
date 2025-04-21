@@ -4,7 +4,9 @@ from ultralytics import YOLO
 model = YOLO("yolo11n.pt")  # pretrained YOLO11n model
 
 # Run batched inference on a list of imagess
-results = model.predict(source="snapshot.jpeg", classes = [0])  # return a list of Results objects
+results = model.predict(
+    source="snapshot.jpeg", classes=[0]
+)  # return a list of Results objects
 
 # Process results list
 for result in results:
@@ -16,4 +18,4 @@ for result in results:
     result.show()  # display to screen
     result.save(filename="result.jpg")  # save to disk
 
-print('Number of people detected:', len(boxes))
+print("Number of people detected:", len(boxes))
