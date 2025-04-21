@@ -1,5 +1,6 @@
 import io
 import os
+from time import sleep
 import discord
 import json
 from dotenv import load_dotenv
@@ -35,7 +36,10 @@ class DiscordBot(discord.Client):
             "+get_state": self.handle_get_state,
             "+post_service": self.handle_post_service,
             "+count_people": self.handle_count_people,
+            "+request_access_to": self.handle_access_request,
+            "+mock": self.handle_mock,
         }
+        self.mock = False
 
     async def on_ready(self):
         """
@@ -77,10 +81,13 @@ class DiscordBot(discord.Client):
             "   +snapshot: Sends a snapshot from the AmiLab camera\n"
             "   +get_state <entity_id>: Gets the state of the specified entity\n"
             "   +post_service <entity_id> <service> <command> [extra_data]: Posts a service command to the specified entity\n"
+            "   +count_people: Counts the number of people in the AmiLab camera image\n"
+            "   +request_access_to <num_people>: Requests access to the specified number of people\n"
+            "   +mock: Toggles mock mode (for testing purposes)\n"
         )
 
     async def handle_snapshot(self, message: discord.Message):
-        img = self.ami_lab.get_snapshot()
+        img = self.ami_lab.get_snapshot(mock=self.mock)
         img = io.BytesIO(img)
         await message.channel.send(file=discord.File(img, "snapshot.jpg"))
         return
@@ -143,11 +150,7 @@ class DiscordBot(discord.Client):
             message (discord.Message): The message received.
         """
         try:
-            img_bytes = self.ami_lab.get_snapshot()
-            with io.BytesIO(img_bytes) as img_bytes:
-                img = Image.open(img_bytes)
-                count, plot_img = self.yolo_model.count_people_in_img(img)
-
+            count, plot_img = self.capture_and_count_people()
             with io.BytesIO() as sent_img:
                 plot_img.save(fp=sent_img, format="JPEG")
                 await message.channel.send(f"Number of people detected: {count}")
@@ -155,6 +158,103 @@ class DiscordBot(discord.Client):
                 await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
         except Exception as e:
             await message.channel.send(f"Error: {e}")
+
+    def capture_and_count_people(self):
+        img_bytes = self.ami_lab.get_snapshot(mock=self.mock)
+        with io.BytesIO(img_bytes) as img_bytes:
+            img = Image.open(img_bytes)
+            count, plot_img = self.yolo_model.count_people_in_img(img)
+        return count, plot_img
+
+    async def handle_access_request(self, message: discord.Message):
+        # Try to obtain num of people rqquested
+        try:
+            parts = message.content.split()
+            num_people = int(parts[1])
+        except ValueError:
+            await message.channel.send("Usage: +request_access_to <num_people>")
+            return
+        except IndexError:
+            await message.channel.send("Usage: +request_access_to <num_people>")
+            return
+        print(f"Requested number of people: {num_people}")
+
+        # Get the number of people in the image
+        try:
+            count, plot_img = self.capture_and_count_people()
+        except Exception as e:
+            await message.channel.send(f"Error: {e}")
+            return
+        # Until the number of people is equal to the requested number
+        # set the light to red
+        print(f"Number of people detected: {count}")
+
+        counter = 0
+        try:
+            while count < num_people:
+                if counter > 10:
+                    await message.channel.send(
+                        "Access denied. Too many attempts. Please try again later."
+                    )
+                    return
+                counter += 1
+                sleep(2)
+                # Get the number of people in the image
+                count, plot_img = self.capture_and_count_people()
+                print(f"Number of people detected: {count}")
+                if count < num_people:
+                    # Set the light to red
+                    self.ami_lab.post_service(
+                        entity_id="light.lampara_derecha",
+                        service="light",
+                        command="turn_on",
+                        extra_data={"brightness_pct": "100", "rgb_color": [255, 0, 0]},
+                    )
+                    print("Color set to red")
+                    # Send the image with the number of people detected
+                    with io.BytesIO() as sent_img:
+                        plot_img.save(fp=sent_img, format="JPEG")
+                        sent_img.seek(0)
+
+                        await message.channel.send(
+                            f"Number of people detected: {count}. Access denied >:(. Retrying analysis..."
+                        )
+                        await message.channel.send(
+                            file=discord.File(sent_img, "plot.jpeg")
+                        )
+            # Set the light to green
+            self.ami_lab.post_service(
+                entity_id="light.lampara_derecha",
+                service="light",
+                command="turn_on",
+                extra_data={"brightness_pct": "100", "rgb_color": [0, 255, 0]},
+            )
+            # Send the image with the number of people detected
+            with io.BytesIO() as sent_img:
+                plot_img.save(fp=sent_img, format="JPEG")
+                sent_img.seek(0)
+                await message.channel.send(
+                    f"Number of people detected: {count}. Access granted ^_^."
+                )
+                sent_img.seek(0)
+                await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
+        except Exception as e:
+            await message.channel.send(f"Error: {e}")
+        return
+    
+    async def handle_mock(self, message: discord.Message):
+        """
+        Handle the mock command.
+
+        Args:
+            message (discord.Message): The message received.
+        """
+        self.mock = not self.mock
+        if self.mock:
+            await message.channel.send("Mock mode enabled.")
+        else:
+            await message.channel.send("Mock mode disabled.")
+
 
 if __name__ == "__main__":
     load_dotenv()

@@ -32,7 +32,10 @@ class AmiLabHttp:
             json=data,
         ).json()
 
-    def get_snapshot(self) -> bytes:
+    def get_snapshot(self, mock=False) -> bytes:
+        if mock:
+            with open("mock.jpg", "rb") as f:
+                return f.read()
         headers = {
             "Authorization": "Bearer " + self.token,
             "Content-Type": "image/jpeg",
@@ -48,15 +51,16 @@ if __name__ == "__main__":
     token = os.getenv("AMI_LAB_TOKEN")
     ami_lab = AmiLabHttp(url, token)
     # print(ami_lab.get_state(entity_id="light.lampara_de_lectura"))
-    # print(
-    #     ami_lab.post_service(
-    #         entity_id="light.lampara_derecha",
-    #         service="light",
-    #         command="turn_on",
-    #         extra_data={"brightness_pct": "100", "rgb_color": [255, 0, 0]},
-    #     )
-    # )
+    print(
+        ami_lab.post_service(
+            entity_id="light.lampara_derecha",
+            service="light",
+            command="turn_on",
+            extra_data={"brightness_pct": "100", "rgb_color": [255, 0, 0]},
+        )
+    )
 
-    img_bytes = ami_lab.get_snapshot()
+"""     img_bytes = ami_lab.get_snapshot()
     with open("snapshot.jpeg", "wb") as f:
         f.write(img_bytes)
+ """
