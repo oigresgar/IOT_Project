@@ -112,7 +112,9 @@ class DiscordBot(discord.Client):
         except IndexError:
             await message.channel.send("Usage: +get_state <entity_id>")
         except Exception as e:
-            await message.channel.send(f"There was an error obtaining the state :( -> {e}")
+            await message.channel.send(
+                f"There was an error obtaining the state :( -> {e}"
+            )
 
     async def handle_post_service(self, message: discord.Message):
         """
@@ -244,7 +246,7 @@ class DiscordBot(discord.Client):
                     sent_img.seek(0)
                     await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
                 return
-        await message.channel.send(f"Max tries reached. Sorry, try again!")
+        await message.channel.send("Max tries reached. Sorry, try again!")
 
     async def handle_mock(self, message: discord.Message):
         """
