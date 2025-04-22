@@ -210,7 +210,7 @@ class DiscordBot(discord.Client):
                     f"There was an error counting people in the room :( -> {e}"
                 )
                 return
-            if count < num_people:
+            if count > num_people:
                 self.ami_lab.post_service(
                     entity_id="light.lampara_derecha",
                     service="light",
