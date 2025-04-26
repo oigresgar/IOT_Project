@@ -195,7 +195,7 @@ class DiscordBot(discord.Client):
         try:
             parts = message.content.split()
             num_people = int(parts[1])
-        except ValueError or IndexError:
+        except (ValueError, IndexError):
             await message.channel.send("Usage: +request_access_to <num_people>")
             return
 
@@ -210,7 +210,24 @@ class DiscordBot(discord.Client):
                     f"There was an error counting people in the room :( -> {e}"
                 )
                 return
-            if count > num_people:
+            if count == num_people:
+                self.ami_lab.post_service(
+                    entity_id="light.lampara_derecha",
+                    service="light",
+                    command="turn_on",
+                    extra_data={"brightness_pct": "100", "rgb_color": [0, 255, 0]},
+                )
+
+                with io.BytesIO() as sent_img:
+                    plot_img.save(fp=sent_img, format="JPEG")
+                    sent_img.seek(0)
+                    await message.channel.send(
+                        f"Number of people detected: {count}. Access granted ^_^."
+                    )
+                    sent_img.seek(0)
+                    await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
+                return
+            else:
                 self.ami_lab.post_service(
                     entity_id="light.lampara_derecha",
                     service="light",
@@ -229,23 +246,7 @@ class DiscordBot(discord.Client):
                         file=discord.File(sent_img, "current_view.jpg")
                     )
                 sleep(3)
-            else:
-                self.ami_lab.post_service(
-                    entity_id="light.lampara_derecha",
-                    service="light",
-                    command="turn_on",
-                    extra_data={"brightness_pct": "100", "rgb_color": [0, 255, 0]},
-                )
 
-                with io.BytesIO() as sent_img:
-                    plot_img.save(fp=sent_img, format="JPEG")
-                    sent_img.seek(0)
-                    await message.channel.send(
-                        f"Number of people detected: {count}. Access granted ^_^."
-                    )
-                    sent_img.seek(0)
-                    await message.channel.send(file=discord.File(sent_img, "plot.jpeg"))
-                return
         await message.channel.send("Max tries reached. Sorry, try again!")
 
     async def handle_mock(self, message: discord.Message):
